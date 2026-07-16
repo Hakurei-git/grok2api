@@ -14,7 +14,7 @@ import orjson
 
 from app.platform.logging.logger import logger
 from app.platform.config.snapshot import get_config
-from app.platform.errors import RateLimitError, UpstreamError, ValidationError
+from app.platform.errors import AppError, RateLimitError, UpstreamError, ValidationError
 from app.platform.runtime.clock import now_s
 from app.platform.storage import save_local_image
 from app.control.model.registry import resolve as resolve_model
@@ -1095,11 +1095,29 @@ async def _run_lite_batch(
             progress_cb=None if progress_cb is None else lambda progress: progress_cb(idx, progress),
         )
 
-    async with asyncio.TaskGroup() as tg:
-        for idx in range(n):
-            tg.create_task(_runner(idx), name=f"lite-image-{idx}")
+    try:
+        async with asyncio.TaskGroup() as tg:
+            for idx in range(n):
+                tg.create_task(_runner(idx), name=f"lite-image-{idx}")
+    except BaseExceptionGroup as exc:
+        app_error = _first_app_error(exc)
+        if app_error is not None:
+            raise app_error from exc
+        raise
 
     return [result for result in results if result is not None]
+
+
+def _first_app_error(exc: BaseException) -> AppError | None:
+    """Return the first application error wrapped by a task group."""
+    if isinstance(exc, AppError):
+        return exc
+    if isinstance(exc, BaseExceptionGroup):
+        for child in exc.exceptions:
+            app_error = _first_app_error(child)
+            if app_error is not None:
+                return app_error
+    return None
 
 
 async def edit(
