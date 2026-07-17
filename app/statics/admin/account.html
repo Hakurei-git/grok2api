@@ -535,15 +535,25 @@
     }
 
     /* Quota pills in table cell */
-    .quota-cell  { display:flex; gap:8px; align-items:center }
+    .quota-cell {
+      display:grid;
+      grid-template-columns:repeat(5, 46px);
+      gap:6px;
+      align-items:center;
+    }
     .q-pill {
       height:20px;
       font-size:11px;
       font-weight:500;
-      padding:0 7px;
+      width:100%;
+      padding:0 4px;
       border-radius:999px;
       display:inline-flex;
       align-items:center;
+      justify-content:center;
+      box-sizing:border-box;
+      white-space:nowrap;
+      font-variant-numeric:tabular-nums;
     }
     .q-a { background:#f1f6fd; color:#5d7fb2 }
     .q-f { background:#f2f8f4; color:#4c9168 }
@@ -1537,17 +1547,15 @@ function rowHtml(t) {
 
 function qpills(q) {
   const modes = [
-    ['auto',     'A', 'q-a', true],
-    ['fast',     'F', 'q-f', true],
-    ['expert',   'E', 'q-e', true],
-    ['heavy',    'H', 'q-h', true],
-    ['grok_4_3', 'B', 'q-b', false],
-    ['console',  'C', 'q-c', false],
+    ['auto',    'A', 'q-a'],
+    ['fast',    'F', 'q-f'],
+    ['expert',  'E', 'q-e'],
+    ['heavy',   'H', 'q-h'],
+    ['console', 'C', 'q-c'],
   ];
-  return modes.map(([m,l,c,showEmpty]) => {
+  return modes.map(([m,l,c]) => {
     const win = q[m];
     if (win == null) {
-      if (!showEmpty) return '';
       return `<span class="q-pill q-z" data-tip="${xe(tr(`account.mode.${m}`, null, m))}: 0">${l}:0</span>`;
     }
     const r = win.remaining ?? null;

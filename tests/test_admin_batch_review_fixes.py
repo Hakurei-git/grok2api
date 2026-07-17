@@ -166,6 +166,14 @@ class AccountHtmlReviewFixTests(unittest.TestCase):
 
         self.assertIn("if (token.status === 'active' || token.status === 'cooling')", html)
 
+    def test_quota_rows_use_five_fixed_aligned_slots(self):
+        html = Path("app/statics/admin/account.html").read_text(encoding="utf-8")
+
+        self.assertIn("grid-template-columns:repeat(5, 46px);", html)
+        self.assertIn("font-variant-numeric:tabular-nums;", html)
+        self.assertIn("['console', 'C', 'q-c']", html)
+        self.assertNotIn("['grok_4_3', 'B', 'q-b'", html)
+
 
 class ConfigHtmlReviewFixTests(unittest.TestCase):
     def test_get_current_value_preserves_schema_defaults(self):
