@@ -7,6 +7,7 @@ from app.control.account.enums import FeedbackKind
 from app.control.model.enums import ModeId
 from app.dataplane.reverse.protocol.xai_chat import StreamAdapter
 from app.platform.errors import UpstreamError
+from app.products import _account_selection
 from app.products.openai import images
 
 
@@ -147,3 +148,17 @@ def test_image_card_accepts_string_progress_with_url():
 
     assert [event.kind for event in events] == ["image_progress", "image"]
     assert events[-1].content.endswith("generated/example.jpg")
+
+
+def test_random_selection_honours_larger_retry_setting(monkeypatch):
+    monkeypatch.setattr(_account_selection, "current_strategy", lambda: "random")
+    monkeypatch.setattr(_account_selection, "get_config", lambda *_args: 9)
+
+    assert _account_selection.selection_max_retries() == 9
+
+
+def test_random_selection_keeps_retry_floor(monkeypatch):
+    monkeypatch.setattr(_account_selection, "current_strategy", lambda: "random")
+    monkeypatch.setattr(_account_selection, "get_config", lambda *_args: 1)
+
+    assert _account_selection.selection_max_retries() == 5
