@@ -37,6 +37,7 @@ env/
 
 # Environment Variables
 .env
+grok-codex-auth.json
 
 # Logs
 logs/
