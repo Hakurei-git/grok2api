@@ -2,6 +2,7 @@ import asyncio
 import re
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import orjson
 
@@ -181,6 +182,38 @@ class AdminTokenTaskReviewFixTests(unittest.IsolatedAsyncioTestCase):
         await task
         await asyncio.sleep(0)
         self.assertNotIn(task, admin_tokens._background_tasks)
+
+    async def test_import_skips_upstream_refresh_when_refresh_is_disabled(self):
+        class _ImportRefreshService:
+            def __init__(self) -> None:
+                self.calls: list[list[str]] = []
+
+            async def refresh_on_import(self, tokens: list[str]) -> RefreshResult:
+                self.calls.append(tokens)
+                return RefreshResult(refreshed=len(tokens))
+
+        service = _ImportRefreshService()
+        with patch.object(admin_tokens, "get_config", return_value=False):
+            completed = await admin_tokens._refresh_imported(service, ["token-1", "token-2"])
+
+        self.assertTrue(completed)
+        self.assertEqual(service.calls, [])
+
+    async def test_import_refreshes_upstream_when_refresh_is_enabled(self):
+        class _ImportRefreshService:
+            def __init__(self) -> None:
+                self.calls: list[list[str]] = []
+
+            async def refresh_on_import(self, tokens: list[str]) -> RefreshResult:
+                self.calls.append(tokens)
+                return RefreshResult(refreshed=len(tokens))
+
+        service = _ImportRefreshService()
+        with patch.object(admin_tokens, "get_config", return_value=True):
+            completed = await admin_tokens._refresh_imported(service, ["token-1"])
+
+        self.assertTrue(completed)
+        self.assertEqual(service.calls, [["token-1"]])
 
 
 if __name__ == "__main__":

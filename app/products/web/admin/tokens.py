@@ -521,6 +521,12 @@ async def replace_pool(
 # ---------------------------------------------------------------------------
 
 async def _refresh_imported(svc: "AccountRefreshService", tokens: list[str]) -> bool:
+    if not bool(get_config("account.refresh.enabled", False)):
+        logger.info(
+            "admin import quota sync skipped: token_count={} reason=refresh_disabled",
+            len(tokens),
+        )
+        return True
     try:
         await svc.refresh_on_import(tokens)
         logger.info("admin import quota sync completed: token_count={}", len(tokens))
