@@ -1,9 +1,11 @@
 from types import SimpleNamespace
 
+import orjson
 import pytest
 
 from app.control.account.enums import FeedbackKind
 from app.control.model.enums import ModeId
+from app.dataplane.reverse.protocol.xai_chat import StreamAdapter
 from app.platform.errors import UpstreamError
 from app.products.openai import images
 
@@ -101,3 +103,47 @@ async def test_lite_request_switches_account_after_retryable_failure(monkeypatch
         ("bad-token", FeedbackKind.RATE_LIMITED, int(ModeId.FAST)),
         ("good-token", FeedbackKind.SUCCESS, int(ModeId.FAST)),
     ]
+
+
+def test_completed_image_card_without_url_is_retryable():
+    adapter = StreamAdapter()
+    card = {
+        "result": {
+            "response": {
+                "cardAttachment": {
+                    "jsonData": (
+                        '{"id":"image-card","image_chunk":'
+                        '{"progress":"100","imageUuid":"image-id"}}'
+                    )
+                }
+            }
+        }
+    }
+
+    with pytest.raises(UpstreamError) as exc_info:
+        adapter.feed(orjson.dumps(card).decode())
+
+    assert exc_info.value.status == 502
+    assert exc_info.value.message == "Image generation completed without an image URL"
+
+
+def test_image_card_accepts_string_progress_with_url():
+    adapter = StreamAdapter()
+    card = {
+        "result": {
+            "response": {
+                "cardAttachment": {
+                    "jsonData": (
+                        '{"id":"image-card","image_chunk":'
+                        '{"progress":"100","imageUuid":"image-id",'
+                        '"imageUrl":"generated/example.jpg"}}'
+                    )
+                }
+            }
+        }
+    }
+
+    events = adapter.feed(orjson.dumps(card).decode())
+
+    assert [event.kind for event in events] == ["image_progress", "image"]
+    assert events[-1].content.endswith("generated/example.jpg")

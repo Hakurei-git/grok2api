@@ -470,17 +470,25 @@ class StreamAdapter:
         self._card_cache[card_id] = jd
 
         chunk = jd.get("image_chunk")
-        if chunk:
+        if isinstance(chunk, dict):
             progress = chunk.get("progress")
             uuid = chunk.get("imageUuid", "")
             events: list[FrameEvent] = []
+            progress_value: int | None = None
             try:
                 if progress is not None:
-                    events.append(FrameEvent("image_progress", str(int(progress)), uuid))
+                    progress_value = int(progress)
+                    events.append(FrameEvent("image_progress", str(progress_value), uuid))
             except (TypeError, ValueError):
                 pass
-            if chunk.get("progress") == 100 and not chunk.get("moderated"):
-                url = _IMAGE_BASE + chunk["imageUrl"]
+            if progress_value == 100 and not chunk.get("moderated"):
+                image_url = chunk.get("imageUrl")
+                if not isinstance(image_url, str) or not image_url.strip():
+                    raise UpstreamError(
+                        "Image generation completed without an image URL",
+                        status=502,
+                    )
+                url = _IMAGE_BASE + image_url
                 self.image_urls.append((url, uuid))
                 events.append(FrameEvent("image", url, uuid))
             return events
