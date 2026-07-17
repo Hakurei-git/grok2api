@@ -147,6 +147,20 @@ class AccountHtmlReviewFixTests(unittest.TestCase):
                 self.assertIn("account", data, f"Locale {path.name} missing account section")
                 self.assertIn("rowActionNotSupported", data["account"])
 
+    def test_random_selection_keeps_quota_metadata_visible(self):
+        html = Path("app/statics/admin/account.html").read_text(encoding="utf-8")
+        self.assertIn('id="overview-quota-stats"', html)
+        self.assertIn("data-quota-only", html)
+        self.assertNotIn("selectionStrategy", html)
+        self.assertNotIn("applyStrategyUI", html)
+
+    def test_active_super_accounts_are_prioritized_in_the_default_view(self):
+        html = Path("app/statics/admin/account.html").read_text(encoding="utf-8")
+
+        self.assertIn("curStatus = 'active'", html)
+        self.assertIn("const DISPLAY_POOL_ORDER = { super: 0, heavy: 1, basic: 2 };", html)
+        self.assertIn("filteredItems.sort(compareAccountsForDisplay);", html)
+
 
 class ConfigHtmlReviewFixTests(unittest.TestCase):
     def test_get_current_value_preserves_schema_defaults(self):

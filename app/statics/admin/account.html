@@ -82,9 +82,6 @@
       gap:12px;
       margin-bottom:20px;
     }
-    .stat-grid.mode-random {
-      grid-template-columns:repeat(4, minmax(0, 1fr));
-    }
     .stat-grid-quota {
       display:grid;
       grid-template-columns:repeat(6, minmax(0, 1fr));
@@ -134,17 +131,6 @@
       margin-top:auto;
     }
     .stat-muted { color:#a1a1aa !important; }
-    [data-random-only] { display:none }
-    .stat-grid.mode-random [data-random-only] { display:flex }
-    .stat-grid.mode-random [data-stat-card="active"] { order:1 }
-    .stat-grid.mode-random [data-stat-card="cooling"] { order:2 }
-    .stat-grid.mode-random [data-stat-card="invalid"] { order:3 }
-    .stat-grid.mode-random [data-stat-card="disabled"] { order:4 }
-    .stat-grid.mode-random [data-stat-card="total"] { order:5 }
-    .stat-grid.mode-random [data-stat-card="calls"] { order:6 }
-    .stat-grid.mode-random [data-stat-card="success"] { order:7 }
-    .stat-grid.mode-random [data-stat-card="rate"] { order:8 }
-
     /* Filters */
     .filter-bar {
       display:flex;
@@ -1126,7 +1112,7 @@
 const PAGE_SIZE_KEY = 'admin.account.page_size';
 const PAGE_SIZE_OPTIONS = [50, 100, 200, 500, 1000, 2000];
 
-let allTokens = [], curStatus = 'all', curNsfw = 'all', curPool = 'all', curPage = 1, pageSize = loadSavedPageSize();
+let allTokens = [], curStatus = 'active', curNsfw = 'all', curPool = 'all', curPage = 1, pageSize = loadSavedPageSize();
 const sel = new Set();
 const refreshingTokens = new Set();
 let _cb = null;
@@ -1209,40 +1195,17 @@ async function _api(method, path, body) {
   return r.json();
 }
 
-// Selection strategy reported by /status — "quota" | "random".
-// Controls whether quota columns / stats are rendered (hidden in random mode).
-let selectionStrategy = 'quota';
-
 // ── Load ───────────────────────────────────────────────────────────────────
 async function load() {
   try {
-    const [data, status] = await Promise.all([
-      _api('GET', '/tokens'),
-      _api('GET', '/status').catch(() => null),
-    ]);
-    if (status && typeof status.selection_strategy === 'string') {
-      selectionStrategy = status.selection_strategy;
-    }
+    const data = await _api('GET', '/tokens');
     allTokens = Array.isArray(data.tokens)
       ? data.tokens
       : Object.entries(data.tokens || {}).flatMap(([pool, items]) =>
           Array.isArray(items) ? items.map(t => ({ ...t, pool: t.pool || pool })) : []);
-    applyStrategyUI();
     invalidateTokenView();
     render();
   } catch (e) { showToast(`${tr('account.loadFailed', null, '加载失败')}: ${e.message}`, 'error'); }
-}
-
-function applyStrategyUI() {
-  // Random strategy: hide quota-related stat cells and the table column.
-  const isRandom = selectionStrategy === 'random';
-  const statsGrid = document.getElementById('overview-stats');
-  if (statsGrid) statsGrid.classList.toggle('mode-random', isRandom);
-  const quotaGrid = document.getElementById('overview-quota-stats');
-  if (quotaGrid) quotaGrid.style.display = isRandom ? 'none' : '';
-  document.querySelectorAll('[data-quota-only]').forEach(el => {
-    el.style.display = isRandom ? 'none' : '';
-  });
 }
 
 // ── Render ─────────────────────────────────────────────────────────────────
@@ -1251,7 +1214,6 @@ function render() {
   renderStats(view);
   renderFilters(view);
   renderTable(view);
-  applyStrategyUI();
 }
 
 function getTokenView() {
@@ -1328,6 +1290,8 @@ function getTokenView() {
     if (matchesPool && matchesStatus && matchesNsfw) filteredItems.push(token);
   }
 
+  filteredItems.sort(compareAccountsForDisplay);
+
   if (curPool !== 'all' && !poolsSet.has(curPool)) {
     curPool = 'all';
     return getTokenView();
@@ -1343,6 +1307,17 @@ function getTokenView() {
     filteredItems,
   };
   return _tokenViewCache;
+}
+
+const DISPLAY_STATUS_ORDER = { active: 0, cooling: 1, expired: 2, invalid: 2, disabled: 3 };
+const DISPLAY_POOL_ORDER = { super: 0, heavy: 1, basic: 2 };
+
+function compareAccountsForDisplay(left, right) {
+  const statusDelta = (DISPLAY_STATUS_ORDER[left.status] ?? 2) - (DISPLAY_STATUS_ORDER[right.status] ?? 2);
+  if (statusDelta) return statusDelta;
+  const poolDelta = (DISPLAY_POOL_ORDER[left.pool || 'basic'] ?? 3) - (DISPLAY_POOL_ORDER[right.pool || 'basic'] ?? 3);
+  if (poolDelta) return poolDelta;
+  return String(left.token || '').localeCompare(String(right.token || ''));
 }
 
 function poolLabel(pool) {
