@@ -161,6 +161,11 @@ class AccountHtmlReviewFixTests(unittest.TestCase):
         self.assertIn("const DISPLAY_POOL_ORDER = { super: 0, heavy: 1, basic: 2 };", html)
         self.assertIn("filteredItems.sort(compareAccountsForDisplay);", html)
 
+    def test_quota_overview_excludes_disabled_and_invalid_accounts(self):
+        html = Path("app/statics/admin/account.html").read_text(encoding="utf-8")
+
+        self.assertIn("if (token.status === 'active' || token.status === 'cooling')", html)
+
 
 class ConfigHtmlReviewFixTests(unittest.TestCase):
     def test_get_current_value_preserves_schema_defaults(self):

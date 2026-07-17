@@ -1257,11 +1257,13 @@ function getTokenView() {
     stats.success += successCount;
     stats.fail += failCount;
     stats.calls += successCount + failCount;
-    stats.qa += quota.auto?.remaining || 0;
-    stats.qf += quota.fast?.remaining || 0;
-    stats.qe += quota.expert?.remaining || 0;
-    stats.qh += quota.heavy?.remaining || 0;
-    stats.qc += quota.console?.remaining || 0;
+    if (token.status === 'active' || token.status === 'cooling') {
+      stats.qa += quota.auto?.remaining || 0;
+      stats.qf += quota.fast?.remaining || 0;
+      stats.qe += quota.expert?.remaining || 0;
+      stats.qh += quota.heavy?.remaining || 0;
+      stats.qc += quota.console?.remaining || 0;
+    }
 
     if (token.status === 'active') stats.active += 1;
     if (token.status === 'cooling') stats.cooling += 1;
